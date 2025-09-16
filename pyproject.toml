@@ -1,0 +1,21 @@
+[project]
+name = "bib-add-year"
+version = "0.1.0"
+description = "CLI tool to add 'year' fields to .bib files based on the 'date' field."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "Mohammad Yaghini", email = "mohammad.yaghini@gmail.com" }
+]
+license = { text = "MIT" }
+
+[project.scripts]
+bib-add-year = "bib_add_year:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+# optional: if you want uv to install as an app with pipx-like behavior
+app = true
