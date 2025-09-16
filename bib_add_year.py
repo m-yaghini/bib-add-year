@@ -3,40 +3,53 @@ import argparse
 import re
 from pathlib import Path
 
-ENTRY_PATTERN = re.compile(r"@(\w+)\s*{\s*([^,]+),", re.MULTILINE)
-DATE_PATTERN = re.compile(r"\bdate\s*=\s*[{|\"](\d{4})[-\d]*[}|\"]", re.IGNORECASE)
-YEAR_PATTERN = re.compile(r"\byear\s*=", re.IGNORECASE)
+# Regex to match date field, e.g. date = {2023-11-02} or date = "2023"
+DATE_FIELD = re.compile(
+    r"(?P<prefix>\bdate\s*=\s*[{\"]\s*)(?P<year>\d{4})(?:[-\d]*)?(?P<suffix>\s*[}\"])",
+    re.IGNORECASE,
+)
 
-def process_bib(content: str) -> str:
-    output = []
-    entries = re.split(r"(@\w+\s*{[^}]*})", content, flags=re.DOTALL)
+# Regex to detect an existing year field
+YEAR_FIELD = re.compile(r"\byear\s*=", re.IGNORECASE)
 
-    for entry in entries:
-        if not entry.strip().startswith("@"):
-            output.append(entry)
-            continue
 
-        # Check for date field
-        m = DATE_PATTERN.search(entry)
-        if m:
-            year = m.group(1)
-            if not YEAR_PATTERN.search(entry):
-                # Insert year field just after the date line
-                entry = re.sub(
-                    r"(date\s*=\s*[{|\"]\d{4}[-\d]*[}|\"]\s*,?)",
-                    r"\1\n  year = {" + year + "},",
-                    entry,
-                    count=1,
-                )
-        output.append(entry)
-    return "".join(output)
+def add_year_to_entry(entry: str) -> str:
+    """If entry has a date but no year, inject a year field."""
+    if YEAR_FIELD.search(entry):
+        return entry  # already has a year
+
+    m = DATE_FIELD.search(entry)
+    if not m:
+        return entry  # no date found
+
+    year = m.group("year")
+
+    # Where to insert the year line:
+    # insert after the matched date line
+    lines = entry.splitlines()
+    for i, line in enumerate(lines):
+        if "date" in line.lower():
+            indent = re.match(r"^\s*", line).group(0)  # preserve indentation
+            lines.insert(i + 1, f"{indent}year = {{{year}}},")
+            break
+    return "\n".join(lines)
+
+
+def process_bib(text: str) -> str:
+    # Split into entries starting with "@"
+    parts = re.split(r"(?=@\w+\s*{)", text, flags=re.MULTILINE)
+    processed = [add_year_to_entry(p) if p.strip().startswith("@") else p for p in parts]
+    return "".join(processed)
+
 
 def main():
     parser = argparse.ArgumentParser(
         description="Add 'year' field to .bib entries based on 'date'."
     )
     parser.add_argument("input", type=Path, help="Input .bib file")
-    parser.add_argument("-o", "--output", type=Path, help="Output file (default: overwrite input)")
+    parser.add_argument(
+        "-o", "--output", type=Path, help="Output file (default: overwrite input)"
+    )
     args = parser.parse_args()
 
     text = args.input.read_text(encoding="utf-8")
@@ -44,6 +57,7 @@ def main():
 
     out_path = args.output if args.output else args.input
     out_path.write_text(new_text, encoding="utf-8")
+
 
 if __name__ == "__main__":
     main()
