@@ -14,7 +14,7 @@ Using [uv](https://github.com/astral-sh/uv):
 
 ```bash
 # From a local clone
-uv pip install -e .
+uv tool install .
 ```
 
 This will install an executable named `bib-add-year`.
